@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>漫展返图系统 - 查看返图</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="card" id="codeInputCard">
+    <div class="card-header">
+      <h1>🎨 漫展返图</h1>
+      <p>输入分享码查看您的返图</p>
+    </div>
+    
+    <div id="alert" class="alert" style="display: none;"></div>
+    
+    <form id="codeForm">
+      <div class="form-group">
+        <label for="shareCode">分享码</label>
+        <input type="text" id="shareCode" class="code-input" placeholder="请输入分享码" required>
+      </div>
+      <button type="submit" class="btn btn-primary">查 看</button>
+    </form>
+    
+    <p class="text-center text-muted" style="font-size:12px;">
+      分享码由摄影师提供，如有疑问请联系摄影师
+    </p>
+  </div>
+
+  <div id="galleryContainer" style="display: none;">
+    <nav class="nav">
+      <a href="#" class="nav-brand">漫展返图系统</a>
+      <div class="nav-links">
+        <span id="eventTitle"></span>
+        <a href="#" id="backBtn">返回</a>
+      </div>
+    </nav>
+    
+    <div class="container">
+      <div class="stats-grid" style="margin-bottom:20px;">
+        <div class="stat-card">
+          <div class="stat-value" id="photoCount">0</div>
+          <div class="stat-label">图片数量</div>
+        </div>
+      </div>
+      
+      <div class="gallery-container" id="photoGallery"></div>
+    </div>
+  </div>
+
+  <div id="imageModal" class="modal-overlay">
+    <div class="modal-content">
+      <img id="modalImage" src="" alt="">
+      <span class="modal-close" onclick="closeImageModal()">✕</span>
+      <a href="#" id="modalDownload" class="modal-download" download>下载原图</a>
+    </div>
+  </div>
+
+  <script>
+    function getUrlParameter(name) {
+      const urlParams = new URLSearchParams(window.location.search);
+      return urlParams.get(name);
+    }
+
+    function showAlert(message, type) {
+      const alertDiv = document.getElementById('alert');
+      alertDiv.textContent = message;
+      alertDiv.className = `alert alert-${type}`;
+      alertDiv.style.display = 'block';
+      setTimeout(() => {
+        alertDiv.style.display = 'none';
+      }, 3000);
+    }
+
+    function validateCode() {
+      const code = document.getElementById('shareCode').value.trim().toUpperCase();
+      
+      if (!code) {
+        showAlert('请输入分享码', 'error');
+        return;
+      }
+      
+      const shareCodes = JSON.parse(localStorage.getItem('shareCodes') || '[]');
+      const shareCode = shareCodes.find(c => c.code === code);
+      
+      if (!shareCode) {
+        showAlert('分享码无效或已过期', 'error');
+        return;
+      }
+      
+      const events = JSON.parse(localStorage.getItem('events') || '[]');
+      const event = events.find(e => e.id === shareCode.eventId);
+      
+      if (!event) {
+        showAlert('活动不存在', 'error');
+        return;
+      }
+      
+      shareCode.usedCount++;
+      localStorage.setItem('shareCodes', JSON.stringify(shareCodes));
+      
+      loadGallery(event, shareCode);
+    }
+
+    function loadGallery(event, shareCode) {
+      document.getElementById('codeInputCard').style.display = 'none';
+      document.getElementById('galleryContainer').style.display = 'block';
+      document.getElementById('eventTitle').textContent = event.name;
+      
+      const photos = JSON.parse(localStorage.getItem('photos') || '[]');
+      const eventPhotos = photos.filter(p => p.eventId === event.id);
+      
+      document.getElementById('photoCount').textContent = eventPhotos.length;
+      
+      const gallery = document.getElementById('photoGallery');
+      
+      if (eventPhotos.length === 0) {
+        gallery.innerHTML = '<p class="text-center text-muted" style="color:white;">该活动暂无图片</p>';
+        return;
+      }
+      
+      gallery.innerHTML = '';
+      
+      eventPhotos.forEach((photo, index) => {
+        const item = document.createElement('div');
+        item.className = 'gallery-item';
+        item.innerHTML = `
+          <img src="${photo.data}" alt="${photo.name}" onclick="openImageModal('${photo.data}', '${photo.name}')">
+          <button class="download-btn" onclick="downloadPhoto('${photo.data}', '${photo.name}')">下载原图</button>
+        `;
+        gallery.appendChild(item);
+      });
+    }
+
+    function openImageModal(src, filename) {
+      document.getElementById('modalImage').src = src;
+      document.getElementById('modalDownload').href = src;
+      document.getElementById('modalDownload').download = filename;
+      document.getElementById('imageModal').classList.add('active');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closeImageModal() {
+      document.getElementById('imageModal').classList.remove('active');
+      document.body.style.overflow = '';
+    }
+
+    function downloadPhoto(dataUrl, filename) {
+      const link = document.createElement('a');
+      link.href = dataUrl;
+      link.download = filename;
+      link.click();
+    }
+
+    document.getElementById('codeForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+      validateCode();
+    });
+
+    document.getElementById('backBtn').addEventListener('click', function() {
+      document.getElementById('galleryContainer').style.display = 'none';
+      document.getElementById('codeInputCard').style.display = 'block';
+      document.getElementById('shareCode').value = '';
+    });
+
+    document.getElementById('imageModal').addEventListener('click', function(e) {
+      if (e.target === this) {
+        closeImageModal();
+      }
+    });
+
+    window.addEventListener('keyup', function(e) {
+      if (e.key === 'Escape') {
+        closeImageModal();
+      }
+    });
+
+    const urlCode = getUrlParameter('code');
+    if (urlCode) {
+      document.getElementById('shareCode').value = urlCode.toUpperCase();
+      validateCode();
+    }
+  </script>
+</body>
+</html>

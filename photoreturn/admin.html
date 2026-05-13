@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>漫展返图系统 - 管理后台</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <nav class="nav">
+    <a href="#" class="nav-brand">漫展返图系统</a>
+    <div class="nav-links">
+      <a href="#events">活动管理</a>
+      <a href="#upload">上传图片</a>
+      <a href="#gallery">图片库</a>
+      <a href="#" id="logout">退出登录</a>
+    </div>
+  </nav>
+
+  <div class="container">
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-value" id="statEvents">0</div>
+        <div class="stat-label">活动数量</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="statPhotos">0</div>
+        <div class="stat-label">图片数量</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="statCodes">0</div>
+        <div class="stat-label">分享码数量</div>
+      </div>
+    </div>
+
+    <div id="events" class="card">
+      <h2>活动管理</h2>
+      <button class="btn btn-primary btn-sm" onclick="showCreateEventModal()">创建新活动</button>
+      
+      <ul class="event-list" id="eventList">
+        <li class="event-item">
+          <div class="event-info">
+            <h3>暂无活动</h3>
+            <p>点击上方按钮创建第一个活动</p>
+          </div>
+        </li>
+      </ul>
+    </div>
+
+    <div id="upload" class="card">
+      <h2>上传图片</h2>
+      <div class="form-group">
+        <label for="eventSelect">选择活动</label>
+        <select id="eventSelect" class="form-group input" style="width:100%;padding:12px;border:2px solid #e0e0e0;border-radius:8px;"></select>
+      </div>
+      <div class="upload-area" id="uploadArea" onclick="document.getElementById('fileInput').click()">
+        <i>📷</i>
+        <p>点击或拖拽图片到这里上传</p>
+      </div>
+      <input type="file" id="fileInput" class="file-input" multiple accept="image/*">
+      <div id="uploadProgress" style="display:none;margin-top:20px;">
+        <div style="background:#f0f0f0;border-radius:8px;height:20px;overflow:hidden;">
+          <div id="progressBar" style="background:linear-gradient(135deg, #667eea 0%, #764ba2 100%);height:100%;width:0%;transition:width 0.3s ease;"></div>
+        </div>
+        <p id="progressText" class="text-center text-muted" style="margin-top:10px;"></p>
+      </div>
+    </div>
+
+    <div id="gallery" class="card">
+      <h2>图片库</h2>
+      <div class="form-group">
+        <select id="galleryEventSelect" class="form-group input" style="width:100%;padding:12px;border:2px solid #e0e0e0;border-radius:8px;margin-bottom:20px;"></select>
+      </div>
+      <div class="gallery-container" id="adminGallery"></div>
+    </div>
+  </div>
+
+  <div id="eventModal" class="modal-overlay">
+    <div class="card" style="max-width:400px;">
+      <h2>创建活动</h2>
+      <div id="modalAlert" class="alert" style="display:none;"></div>
+      <form id="eventForm">
+        <div class="form-group">
+          <label>活动名称</label>
+          <input type="text" id="eventName" placeholder="如：2024年XX漫展" required>
+        </div>
+        <div class="form-group">
+          <label>活动日期</label>
+          <input type="date" id="eventDate" required>
+        </div>
+        <div class="form-group">
+          <label>分享码位数</label>
+          <select id="codeLength">
+            <option value="4">4位</option>
+            <option value="6">6位</option>
+            <option value="8">8位</option>
+          </select>
+        </div>
+        <button type="submit" class="btn btn-primary">创 建</button>
+        <button type="button" class="btn btn-secondary" onclick="closeModal()">取 消</button>
+      </form>
+    </div>
+  </div>
+
+  <div id="shareModal" class="modal-overlay">
+    <div class="card" style="max-width:400px;">
+      <h2>分享活动</h2>
+      <div id="shareAlert" class="alert" style="display:none;"></div>
+      <div class="form-group">
+        <label>自定义分享码（可选）</label>
+        <input type="text" id="customCode" placeholder="留空则随机生成">
+      </div>
+      <button class="btn btn-primary" onclick="generateShareCode()">生成分享码</button>
+      <div id="shareResult" style="display:none;margin-top:20px;">
+        <div class="qr-code">
+          <img id="qrCodeImg" src="" alt="二维码">
+          <p class="share-url" id="shareUrl"></p>
+        </div>
+        <div class="form-group">
+          <label>分享码</label>
+          <input type="text" id="shareCodeDisplay" readonly class="code-input">
+        </div>
+        <button class="btn btn-outline btn-sm" onclick="copyShareCode()">复制链接</button>
+      </div>
+      <button type="button" class="btn btn-secondary" onclick="closeShareModal()">关 闭</button>
+    </div>
+  </div>
+
+  <script>
+    let currentEventId = null;
+    let shareEventId = null;
+
+    function checkLogin() {
+      const user = localStorage.getItem('currentUser');
+      if (!user) {
+        window.location.href = 'index.html';
+      }
+    }
+
+    function logout() {
+      localStorage.removeItem('currentUser');
+      window.location.href = 'index.html';
+    }
+
+    document.getElementById('logout').addEventListener('click', logout);
+
+    function showCreateEventModal() {
+      document.getElementById('eventModal').classList.add('active');
+    }
+
+    function closeModal() {
+      document.getElementById('eventModal').classList.remove('active');
+      document.getElementById('eventForm').reset();
+      document.getElementById('modalAlert').style.display = 'none';
+    }
+
+    function closeShareModal() {
+      document.getElementById('shareModal').classList.remove('active');
+      document.getElementById('shareResult').style.display = 'none';
+      document.getElementById('customCode').value = '';
+      document.getElementById('shareAlert').style.display = 'none';
+    }
+
+    function generateRandomCode(length) {
+      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+      let result = '';
+      for (let i = 0; i < length; i++) {
+        result += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+      return result;
+    }
+
+    document.getElementById('eventForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+      
+      const name = document.getElementById('eventName').value;
+      const date = document.getElementById('eventDate').value;
+      const codeLength = parseInt(document.getElementById('codeLength').value);
+      const alertDiv = document.getElementById('modalAlert');
+      
+      const events = JSON.parse(localStorage.getItem('events') || '[]');
+      
+      if (events.find(e => e.name === name)) {
+        alertDiv.textContent = '该活动名称已存在';
+        alertDiv.className = 'alert alert-error';
+        alertDiv.style.display = 'block';
+        return;
+      }
+      
+      const event = {
+        id: Date.now(),
+        name,
+        date,
+        codeLength,
+        createdAt: new Date().toISOString()
+      };
+      
+      events.push(event);
+      localStorage.setItem('events', JSON.stringify(events));
+      
+      alertDiv.textContent = '活动创建成功！';
+      alertDiv.className = 'alert alert-success';
+      alertDiv.style.display = 'block';
+      
+      setTimeout(() => {
+        closeModal();
+        loadEvents();
+        updateStats();
+      }, 1500);
+    });
+
+    function loadEvents() {
+      const events = JSON.parse(localStorage.getItem('events') || '[]');
+      const eventList = document.getElementById('eventList');
+      const eventSelect = document.getElementById('eventSelect');
+      const galleryEventSelect = document.getElementById('galleryEventSelect');
+      
+      eventSelect.innerHTML = '<option value="">请选择活动</option>';
+      galleryEventSelect.innerHTML = '<option value="">请选择活动</option>';
+      
+      if (events.length === 0) {
+        eventList.innerHTML = '<li class="event-item"><div class="event-info"><h3>暂无活动</h3><p>点击上方按钮创建第一个活动</p></div></li>';
+        return;
+      }
+      
+      eventList.innerHTML = '';
+      
+      events.forEach(event => {
+        const li = document.createElement('li');
+        li.className = 'event-item';
+        li.innerHTML = `
+          <div class="event-info">
+            <h3>${event.name}</h3>
+            <p>${event.date} | 分享码位数: ${event.codeLength}</p>
+          </div>
+          <div class="event-actions">
+            <button class="btn btn-outline btn-sm" onclick="openShareModal(${event.id})">分享</button>
+            <button class="btn btn-danger btn-sm" onclick="deleteEvent(${event.id})">删除</button>
+          </div>
+        `;
+        eventList.appendChild(li);
+        
+        const option = document.createElement('option');
+        option.value = event.id;
+        option.textContent = event.name;
+        eventSelect.appendChild(option.cloneNode(true));
+        galleryEventSelect.appendChild(option);
+      });
+    }
+
+    function openShareModal(eventId) {
+      shareEventId = eventId;
+      document.getElementById('shareModal').classList.add('active');
+    }
+
+    function generateShareCode() {
+      const customCode = document.getElementById('customCode').value.trim().toUpperCase();
+      const alertDiv = document.getElementById('shareAlert');
+      
+      const events = JSON.parse(localStorage.getItem('events') || '[]');
+      const event = events.find(e => e.id === shareEventId);
+      
+      let code;
+      if (customCode) {
+        const existingCodes = JSON.parse(localStorage.getItem('shareCodes') || '[]');
+        if (existingCodes.find(c => c.code === customCode)) {
+          alertDiv.textContent = '该分享码已被使用';
+          alertDiv.className = 'alert alert-error';
+          alertDiv.style.display = 'block';
+          return;
+        }
+        code = customCode;
+      } else {
+        code = generateRandomCode(event.codeLength);
+      }
+      
+      const shareCodes = JSON.parse(localStorage.getItem('shareCodes') || '[]');
+      shareCodes.push({
+        id: Date.now(),
+        eventId: shareEventId,
+        code,
+        createdAt: new Date().toISOString(),
+        usedCount: 0
+      });
+      localStorage.setItem('shareCodes', JSON.stringify(shareCodes));
+      
+      const shareUrl = `${window.location.origin}${window.location.pathname.replace('admin.html', 'viewer.html')}?code=${code}`;
+      
+      document.getElementById('shareCodeDisplay').value = code;
+      document.getElementById('shareUrl').textContent = shareUrl;
+      document.getElementById('qrCodeImg').src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(shareUrl)}`;
+      document.getElementById('shareResult').style.display = 'block';
+      
+      updateStats();
+    }
+
+    function copyShareCode() {
+      const url = document.getElementById('shareUrl').textContent;
+      navigator.clipboard.writeText(url).then(() => {
+        alert('链接已复制到剪贴板');
+      });
+    }
+
+    function deleteEvent(eventId) {
+      if (!confirm('确定要删除这个活动吗？相关的图片和分享码也会被删除。')) {
+        return;
+      }
+      
+      let events = JSON.parse(localStorage.getItem('events') || '[]');
+      events = events.filter(e => e.id !== eventId);
+      localStorage.setItem('events', JSON.stringify(events));
+      
+      let photos = JSON.parse(localStorage.getItem('photos') || '[]');
+      photos = photos.filter(p => p.eventId !== eventId);
+      localStorage.setItem('photos', JSON.stringify(photos));
+      
+      let shareCodes = JSON.parse(localStorage.getItem('shareCodes') || '[]');
+      shareCodes = shareCodes.filter(c => c.eventId !== eventId);
+      localStorage.setItem('shareCodes', JSON.stringify(shareCodes));
+      
+      loadEvents();
+      updateStats();
+      loadGallery();
+    }
+
+    function updateStats() {
+      const events = JSON.parse(localStorage.getItem('events') || '[]');
+      const photos = JSON.parse(localStorage.getItem('photos') || '[]');
+      const shareCodes = JSON.parse(localStorage.getItem('shareCodes') || '[]');
+      
+      document.getElementById('statEvents').textContent = events.length;
+      document.getElementById('statPhotos').textContent = photos.length;
+      document.getElementById('statCodes').textContent = shareCodes.length;
+    }
+
+    document.getElementById('uploadArea').addEventListener('dragover', function(e) {
+      e.preventDefault();
+      this.classList.add('dragover');
+    });
+
+    document.getElementById('uploadArea').addEventListener('dragleave', function(e) {
+      e.preventDefault();
+      this.classList.remove('dragover');
+    });
+
+    document.getElementById('uploadArea').addEventListener('drop', function(e) {
+      e.preventDefault();
+      this.classList.remove('dragover');
+      handleFiles(e.dataTransfer.files);
+    });
+
+    document.getElementById('fileInput').addEventListener('change', function(e) {
+      handleFiles(e.target.files);
+    });
+
+    function handleFiles(files) {
+      const eventId = document.getElementById('eventSelect').value;
+      
+      if (!eventId) {
+        alert('请先选择一个活动');
+        return;
+      }
+      
+      const uploadProgress = document.getElementById('uploadProgress');
+      const progressBar = document.getElementById('progressBar');
+      const progressText = document.getElementById('progressText');
+      
+      uploadProgress.style.display = 'block';
+      progressBar.style.width = '0%';
+      
+      let uploaded = 0;
+      const total = files.length;
+      const photos = JSON.parse(localStorage.getItem('photos') || '[]');
+      
+      Array.from(files).forEach((file, index) => {
+        if (!file.type.startsWith('image/')) {
+          alert(`${file.name} 不是图片文件`);
+          return;
+        }
+        
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          photos.push({
+            id: Date.now() + index,
+            eventId: parseInt(eventId),
+            name: file.name,
+            data: e.target.result,
+            uploadedAt: new Date().toISOString()
+          });
+          
+          uploaded++;
+          progressBar.style.width = `${(uploaded / total) * 100}%`;
+          progressText.textContent = `已上传 ${uploaded}/${total}`;
+          
+          if (uploaded === total) {
+            localStorage.setItem('photos', JSON.stringify(photos));
+            setTimeout(() => {
+              uploadProgress.style.display = 'none';
+              alert('图片上传成功！');
+              updateStats();
+              loadGallery();
+            }, 500);
+          }
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
+    function loadGallery() {
+      const eventId = document.getElementById('galleryEventSelect').value;
+      const gallery = document.getElementById('adminGallery');
+      
+      if (!eventId) {
+        gallery.innerHTML = '<p class="text-center text-muted">请选择一个活动查看图片</p>';
+        return;
+      }
+      
+      const photos = JSON.parse(localStorage.getItem('photos') || '[]');
+      const eventPhotos = photos.filter(p => p.eventId === parseInt(eventId));
+      
+      if (eventPhotos.length === 0) {
+        gallery.innerHTML = '<p class="text-center text-muted">该活动暂无图片</p>';
+        return;
+      }
+      
+      gallery.innerHTML = '';
+      
+      eventPhotos.forEach(photo => {
+        const item = document.createElement('div');
+        item.className = 'gallery-item';
+        item.innerHTML = `
+          <img src="${photo.data}" alt="${photo.name}">
+          <button class="download-btn" onclick="downloadPhoto('${photo.data}', '${photo.name}')">下载原图</button>
+          <button class="download-btn" style="left:10px;" onclick="deletePhoto(${photo.id})">删除</button>
+        `;
+        gallery.appendChild(item);
+      });
+    }
+
+    document.getElementById('galleryEventSelect').addEventListener('change', loadGallery);
+
+    function downloadPhoto(dataUrl, filename) {
+      const link = document.createElement('a');
+      link.href = dataUrl;
+      link.download = filename;
+      link.click();
+    }
+
+    function deletePhoto(photoId) {
+      if (!confirm('确定要删除这张图片吗？')) {
+        return;
+      }
+      
+      let photos = JSON.parse(localStorage.getItem('photos') || '[]');
+      photos = photos.filter(p => p.id !== photoId);
+      localStorage.setItem('photos', JSON.stringify(photos));
+      
+      updateStats();
+      loadGallery();
+    }
+
+    checkLogin();
+    loadEvents();
+    updateStats();
+    loadGallery();
+  </script>
+</body>
+</html>

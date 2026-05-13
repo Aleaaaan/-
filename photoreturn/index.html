@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>漫展返图系统 - 登录</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="card">
+    <div class="card-header">
+      <h1>漫展返图系统</h1>
+      <p>欢迎回来，请登录您的账号</p>
+    </div>
+    
+    <div id="alert" class="alert alert-error" style="display: none;"></div>
+    
+    <form id="loginForm">
+      <div class="form-group">
+        <label for="username">用户名</label>
+        <input type="text" id="username" placeholder="请输入用户名" required>
+      </div>
+      <div class="form-group">
+        <label for="password">密码</label>
+        <input type="password" id="password" placeholder="请输入密码" required>
+      </div>
+      <button type="submit" class="btn btn-primary">登 录</button>
+    </form>
+    
+    <p class="text-center">
+      还没有账号？<a href="register.html" class="link">立即注册</a>
+    </p>
+    
+    <p class="text-center">
+      <a href="viewer.html" class="link">作为游客查看返图</a>
+    </p>
+  </div>
+
+  <script>
+    document.getElementById('loginForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+      
+      const username = document.getElementById('username').value;
+      const password = document.getElementById('password').value;
+      const alertDiv = document.getElementById('alert');
+      
+      const users = JSON.parse(localStorage.getItem('users') || '[]');
+      const user = users.find(u => u.username === username && u.password === password);
+      
+      if (user) {
+        localStorage.setItem('currentUser', JSON.stringify(user));
+        window.location.href = 'admin.html';
+      } else {
+        alertDiv.textContent = '用户名或密码错误';
+        alertDiv.style.display = 'block';
+      }
+    });
+  </script>
+</body>
+</html>
